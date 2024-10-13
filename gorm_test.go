@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 	"strconv"
 	"testing"
@@ -373,4 +374,105 @@ func TestAutoIncrement(t *testing.T) {
 
 		fmt.Println(userLog.ID)
 	}
+}
+
+func TestCreateOrUpdate(t *testing.T) {
+	userLog := UserLog{
+		UserId: "1",
+		Action: "Test Action",
+	}
+
+	err := db.Save(&userLog).Error
+	assert.Nil(t, err)
+
+	userLog.UserId = "2"
+	err = db.Save(&userLog).Error
+	assert.Nil(t, err)
+}
+
+func TestCreateOrUpdateNonAutoIncrement(t *testing.T) {
+	user := User{
+		ID:   "99",
+		Name: Name{FirstName: "User 99"},
+	}
+
+	err := db.Save(&user).Error
+	assert.Nil(t, err)
+
+	user.Name = Name{FirstName: "User 99 updated"}
+	err = db.Save(&user).Error
+	assert.Nil(t, err)
+}
+
+func TestConflict(t *testing.T) {
+	user := User{
+		ID:   "88",
+		Name: Name{FirstName: "User 88"},
+	}
+
+	err := db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&user).Error
+	assert.Nil(t, err)
+}
+
+func TestDelete(t *testing.T) {
+	var user User
+	err := db.Take(&user, "id = ?", "99").Error
+	assert.Nil(t, err)
+
+	err = db.Delete(&user).Error
+	assert.Nil(t, err)
+
+	err = db.Delete(&User{}, "id = ?", "88").Error
+	assert.Nil(t, err)
+
+	err = db.Where("id = ?", "19").Delete(&User{}).Error
+	assert.Nil(t, err)
+}
+
+func TestSoftDelete(t *testing.T) {
+	todo := Todo{
+		UserId:      "1",
+		Title:       "1",
+		Description: "Todo 1",
+	}
+	err := db.Create(&todo).Error
+	assert.Nil(t, err)
+
+	err = db.Delete(&todo).Error
+	assert.Nil(t, err)
+	assert.NotNil(t, todo.DeletedAt)
+
+	var todos []Todo
+	err = db.Find(&todo).Error
+	assert.Nil(t, err)
+	assert.Equal(t, 0, len(todos))
+}
+
+func TestUnscoped(t *testing.T) {
+	var todo Todo
+	err := db.Unscoped().First(&todo, "id = ?", "3").Error
+	assert.Nil(t, err)
+
+	err = db.Unscoped().Delete(&todo).Error
+	assert.Nil(t, err)
+
+	var todos []Todo
+	err = db.Unscoped().Find(&todos).Error
+	assert.Nil(t, err)
+}
+
+func TestLock(t *testing.T) {
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var user User
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Take(&user, "id = ?", "1").Error
+		if err != nil {
+			return err
+		}
+
+		user.Name.FirstName = "User 1 updated"
+		user.Password = "newupdate"
+		err = tx.Save(&user).Error
+		return err
+	})
+	assert.Nil(t, err)
 }
