@@ -476,3 +476,126 @@ func TestLock(t *testing.T) {
 	})
 	assert.Nil(t, err)
 }
+
+func TestCreateWallet(t *testing.T) {
+	wallet := Wallet{
+		ID:      "1",
+		UserId:  "1",
+		Balance: 1000000000,
+	}
+
+	err := db.Create(&wallet).Error
+	assert.Nil(t, err)
+}
+
+func TestRetrieveRelation(t *testing.T) {
+	var user User
+	err := db.Model(User{}).Preload("Wallet").Take(&user, "id = ?", "1").Error
+	assert.Nil(t, err)
+	assert.Equal(t, "1", user.ID)
+	assert.Equal(t, "1", user.Wallet.ID)
+}
+
+func TestRetrieveRelationJoin(t *testing.T) {
+	var user User
+	err := db.Model(User{}).Joins("Wallet").Take(&user, "users.id = ?", "1").Error
+	assert.Nil(t, err)
+	assert.Equal(t, "1", user.ID)
+	assert.Equal(t, "1", user.Wallet.ID)
+}
+
+func TestAutoCreateUpdate(t *testing.T) {
+	user := User{
+		ID:       "20",
+		Name:     Name{FirstName: "User 20"},
+		Password: "rahasia",
+		Wallet: Wallet{
+			ID:      "20",
+			UserId:  "20",
+			Balance: 1000000000,
+		},
+	}
+
+	err := db.Create(&user).Error
+	assert.Nil(t, err)
+}
+
+func TestSkipAutoCreateUpdate(t *testing.T) {
+	user := User{
+		ID:       "21",
+		Name:     Name{FirstName: "User 21"},
+		Password: "rahasia",
+		Wallet: Wallet{
+			ID:      "21",
+			UserId:  "21",
+			Balance: 1000000000,
+		},
+	}
+
+	err := db.Omit(clause.Associations).Create(&user).Error
+	assert.Nil(t, err)
+}
+
+func TestUserAndAddresses(t *testing.T) {
+	user := User{
+		ID:       "23",
+		Name:     Name{FirstName: "User 23"},
+		Password: "rahasia",
+		Wallet: Wallet{
+			ID:      "23",
+			UserId:  "23",
+			Balance: 1000000000,
+		},
+		Addresses: []Address{
+			{
+				UserId:  "23",
+				Address: "Jalan A",
+			},
+			{
+				UserId:  "23",
+				Address: "Jalan B",
+			},
+		},
+	}
+
+	err := db.Create(&user).Error
+	assert.Nil(t, err)
+}
+
+func TestPreloadJoinOneToMany(t *testing.T) {
+	var users []User
+	err := db.Model(&User{}).Preload("Addresses").
+		Joins("Wallet").Find(&users).Error
+	assert.Nil(t, err)
+}
+
+func TestTakePreloadJoinOneToMany(t *testing.T) {
+	var user User
+	err := db.Model(&User{}).Preload("Addresses").
+		Joins("Wallet").Take(&user, "users.id = ?", "20").Error
+	assert.Nil(t, err)
+}
+
+func TestBelongsTo(t *testing.T) {
+	fmt.Println("Preload")
+	var addresses []Address
+	err := db.Model(&Address{}).Preload("User").Find(&addresses).Error
+	assert.Nil(t, err)
+	assert.Equal(t, 4, len(addresses))
+
+	fmt.Println("Join")
+	err = db.Model(&Address{}).Joins("User").Find(&addresses).Error
+	assert.Nil(t, err)
+	assert.Equal(t, 4, len(addresses))
+}
+
+func TestBelongsToWallet(t *testing.T) {
+	fmt.Println("Preload")
+	var wallets []Wallet
+	err := db.Model(&Wallet{}).Preload("User").Find(&wallets).Error
+	assert.Nil(t, err)
+
+	fmt.Println("Join")
+	err = db.Model(&Wallet{}).Joins("User").Find(&wallets).Error
+	assert.Nil(t, err)
+}
