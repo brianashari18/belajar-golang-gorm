@@ -1,6 +1,9 @@
 package golang_gorm
 
-import "time"
+import (
+	"gorm.io/gorm"
+	"time"
+)
 
 type User struct {
 	ID           string    `gorm:"primary_key;column:id;<-:create"`
@@ -14,8 +17,15 @@ type User struct {
 	LikeProducts []Product `gorm:"many2many:user_like_product;foreignKey:id;joinForeignKey:user_id;references:id;joinReferences:product_id"`
 }
 
-func (user *User) TableName() string {
+func (u *User) TableName() string {
 	return "users"
+}
+
+func (u *User) BeforeCreate(db *gorm.DB) error {
+	if u.ID == "" {
+		u.ID = "User-" + time.Now().Format("20060102150405")
+	}
+	return nil
 }
 
 type Name struct {
